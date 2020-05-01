@@ -11,6 +11,7 @@ import toolkits
 import model as spkModel
 import os
 from viewer import PlotDiar
+import time
 
 # ===========================================
 #        Parse the argument
@@ -120,7 +121,7 @@ def load_data(path, win_length=400, sr=16000, hop_length=160, n_fft=512, embeddi
         if(cur_slide + spec_len > time):
             break
         spec_mag = mag_T[:, int(cur_slide+0.5) : int(cur_slide+spec_len+0.5)]
-        
+
         # preprocessing, subtract mean, divided by time-wise var
         mu = np.mean(spec_mag, 0, keepdims=True)
         std = np.std(spec_mag, 0, keepdims=True)
@@ -133,8 +134,12 @@ def load_data(path, win_length=400, sr=16000, hop_length=160, n_fft=512, embeddi
 
 def main(wav_path, embedding_per_second=1.0, overlap_rate=0.5):
 
+    start = time.time()
     # gpu configuration
     toolkits.initialize_GPU(args)
+    print('------------ gpu init: {}'.format(time.time() - start))
+    start = time.time()
+    
 
     params = {'dim': (257, None, 1),
               'nfft': 512,
@@ -150,28 +155,40 @@ def main(wav_path, embedding_per_second=1.0, overlap_rate=0.5):
                                                 num_class=params['n_classes'],
                                                 mode='eval', args=args)
     network_eval.load_weights(args.resume, by_name=True)
+    print('------------ embedding load: {}'.format(time.time() - start))
+    start = time.time()
 
 
     model_args, _, inference_args = uisrnn.parse_arguments()
     model_args.observation_dim = 512
     uisrnnModel = uisrnn.UISRNN(model_args)
     uisrnnModel.load(SAVED_MODEL_NAME)
+    print('------------ UIS-RNN load: {}'.format(time.time() - start))
+    start = time.time()
 
     specs, intervals = load_data(wav_path, embedding_per_second=embedding_per_second, overlap_rate=overlap_rate)
     mapTable, keys = genMap(intervals)
+    print('------------ Data load: {}'.format(time.time() - start))
+    start = time.time()
 
     feats = []
     for spec in specs:
         spec = np.expand_dims(np.expand_dims(spec, 0), -1)
         v = network_eval.predict(spec)
         feats += [v]
+    print('------------ embedding infer: {}'.format(time.time() - start))
+    start = time.time()
 
     feats = np.array(feats)[:,0,:].astype(float)  # [splits, embedding dim]
     predicted_label = uisrnnModel.predict(feats, inference_args)
+    print('------------ UIS-RNN infer: {}'.format(time.time() - start))
+    start = time.time()
 
     time_spec_rate = 1000*(1.0/embedding_per_second)*(1.0-overlap_rate) # speaker embedding every ?ms
     center_duration = int(1000*(1.0/embedding_per_second)//2)
     speakerSlice = arrangeResult(predicted_label, time_spec_rate)
+    print('------------ arrange: {}'.format(time.time() - start))
+    start = time.time()
 
     for spk,timeDicts in speakerSlice.items():    # time map to orgin wav(contains mute)
         for tid,timeDict in enumerate(timeDicts):
@@ -189,20 +206,27 @@ def main(wav_path, embedding_per_second=1.0, overlap_rate=0.5):
 
             speakerSlice[spk][tid]['start'] = s
             speakerSlice[spk][tid]['stop'] = e
+    print('------------ map: {}'.format(time.time() - start))
+    start = time.time()
 
+    results = []
     for spk,timeDicts in speakerSlice.items():
-        print('========= ' + str(spk) + ' =========')
+        # print('========= ' + str(spk) + ' =========')
         for timeDict in timeDicts:
             s = timeDict['start']
             e = timeDict['stop']
             s = fmtTime(s)  # change point moves to the center of the slice
             e = fmtTime(e)
-            print(s+' ==> '+e)
+            # print(s+' ==> '+e)
+            results.append([s, e, str(spk)])
 
-    p = PlotDiar(map=speakerSlice, wav=wav_path, gui=True, size=(25, 6))
-    p.draw()
-    p.plot.show()
+    results = sorted(results, key=lambda row: row[0])
+    print('\n'.join(map(lambda row: f'{row[0]} ==> {row[1]} : {row[2]}', results)))
+
+    # p = PlotDiar(map=speakerSlice, wav=wav_path, gui=True, size=(25, 6))
+    # p.draw()
+    # p.plot.show()
 
 if __name__ == '__main__':
-    main(r'wavs/rmdmy.wav', embedding_per_second=1.2, overlap_rate=0.4)
+    main(r'/home/jonghoon.seo/diarize_test.wav', embedding_per_second=1.2, overlap_rate=0.4)
 

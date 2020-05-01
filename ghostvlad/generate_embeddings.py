@@ -8,6 +8,8 @@ import librosa
 import toolkits
 import random
 
+import more_tts
+
 # ===========================================
 #        Parse the argument
 # ===========================================
@@ -117,7 +119,8 @@ def prepare_data(SRC_PATH):
     allspk_list = []
     for i,spkDir in enumerate(wavDir):   # Each speaker's directory
         spk = spkDir    # speaker name
-        wavPath = os.path.join(SRC_PATH, spkDir, 'audio')
+
+        wavPath = os.path.join(SRC_PATH, spkDir)
         for wav in os.listdir(wavPath): # wavfile
             utter_path = os.path.join(wavPath, wav)
             allpath_list.append(utter_path)
@@ -137,7 +140,7 @@ def main():
     # ==================================
     #       Get Train/Val.
     # ==================================
-    
+
     total_list = [os.path.join(args.data_path, file) for file in os.listdir(args.data_path)]
     unique_list = np.unique(total_list)
 
@@ -174,12 +177,14 @@ def main():
     # The feature extraction process has to be done sample-by-sample,
     # because each sample is of different lengths.
 
-    SRC_PATH = r'/data/dataset/SpkWav120'
-    path_spk_tuples = prepare_data(SRC_PATH)
+    #SRC_PATH = r'/data/dataset/SpkWav120'
+    #SRC_PATH = r'/nas0/poodle/speech_dataset.en/raw/VCTK/VCTK-Corpus/wav48'
+    #path_spk_tuples = _prepare_data_for_more_tts(SRC_PATH)
+    path_spk_tuples = more_tts.prepare_data_all()
     train_sequence = []
     train_cluster_id = []
 
-    for epoch in range(7000): # Random choice utterances from whole wavfiles
+    for epoch in range(1000): # Random choice utterances from whole wavfiles
         # A merged utterance contains [10,20] utterances
         splits_count = np.random.randint(10, 20, 1)
         path_spks = random.sample(path_spk_tuples, splits_count[0])
@@ -195,7 +200,7 @@ def main():
         train_cluster_id.append(utterance_speakers)
         print("epoch:{}, utterance length: {}, speakers: {}".format(epoch, len(utterance_speakers), len(path_spks)))
 
-    np.savez('training_data', train_sequence=train_sequence, train_cluster_id=train_cluster_id)
+    np.savez('training_data_less', train_sequence=train_sequence, train_cluster_id=train_cluster_id)
 
 
 if __name__ == "__main__":

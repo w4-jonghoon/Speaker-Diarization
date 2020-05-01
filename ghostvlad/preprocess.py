@@ -35,8 +35,10 @@ def similar(matrix):  # calc speaker-embeddings similarity in pretty format outp
     ids = matrix.shape[0]
     for i in range(ids):
         for j in range(ids):
-            dist = matrix[i,:]*matrix[j,:]
+#            dist = matrix[i,:]*matrix[j,:]
             dist = np.linalg.norm(matrix[i,:] - matrix[j,:])
+            if dist < 0.5:
+                dist = 0
             print('%.2f  ' % dist, end='')
             if((j+1)%3==0 and j!=0):
                 print("| ", end='')
@@ -106,7 +108,7 @@ def main():
     # ==================================
     #       Get Train/Val.
     # ==================================
-    
+
     total_list = [os.path.join(args.data_path, file) for file in os.listdir(args.data_path)]
     unique_list = np.unique(total_list)
 

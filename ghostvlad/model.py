@@ -78,6 +78,7 @@ def amsoftmax_loss(y_true, y_pred, scale=30, margin=0.35):
 
 
 def vggvox_resnet2d_icassp(input_dim=(257, 250, 1), num_class=8631, mode='train', args=None):
+    print('---------------------', args)
     net=args.net
     loss=args.loss
     vlad_clusters=args.vlad_cluster
